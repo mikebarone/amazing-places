@@ -5,6 +5,10 @@ import {SetLocationPage} from "../set-location/set-location";
 import {Location} from "../../models/location"
 import { Geolocation } from '@ionic-native/geolocation';
 import { Camera, CameraOptions } from '@ionic-native/camera';
+import {PlacesService} from "../../services/places";
+import {Entry, File, FileError} from '@ionic-native/file';
+
+declare var cordova: any;
 
 @IonicPage()
 @Component({
@@ -25,10 +29,20 @@ export class AddPlacePage {
     private geolocation: Geolocation,
     private camera: Camera,
     private loadingCtrl: LoadingController,
-    private toastCtrl: ToastController) {}
+    private toastCtrl: ToastController,
+    private placesService: PlacesService,
+    private file: File) {}
 
   onSubmit(form: NgForm) {
     console.log(form.value);
+    this.placesService.addPlace(form.value.title, form.value.description, this.location, this.imageUrl);
+    form.reset();
+    this.location = {
+      lat: 40.7624324,
+      lng: -73.9759827
+    };
+    this.imageUrl = '';
+    this.locationIsSet = false;
   }
 
   onOpenMap() {
@@ -87,9 +101,35 @@ export class AddPlacePage {
       // If it's base64:
       //let base64Image = 'data:image/jpeg;base64,' + imageData;
       //console.log(imageData);
+      const currentName = imageData.replace(/^.*[\\\/]/, '');
+      const path = imageData.replace(/[^\/]*$/, '');
+      const newFileName = new Date().getUTCMilliseconds() + '.jpeg';
+      this.file.moveFile(path, currentName, /*cordova.file.dataDirectory*/ this.file.dataDirectory, newFileName)
+        .then(
+          (data: Entry) => {
+            this.imageUrl = data.nativeURL;
+            this.camera.cleanup();
+            // this.file.removeFile(path, currentName);
+          }
+        )
+        .catch(
+          (err: FileError) => {
+            this.imageUrl = '';
+            const toast = this.toastCtrl.create({
+              message: 'Could not save the image',
+              duration: 2500
+            });
+            toast.present();
+            this.camera.cleanup();
+          }
+        );
       this.imageUrl = imageData;
     }, (err) => {
-      console.log(err);
+      const toast = this.toastCtrl.create({
+        message: 'Could not take the image',
+        duration: 2500
+      });
+      toast.present();
     });
   }
 
